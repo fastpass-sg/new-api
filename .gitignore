@@ -35,3 +35,13 @@ data/
 .test
 token_estimator_test.go
 skills-lock.json
+
+# Production deploy artifacts (docker-compose.prod.yml)
+.env
+.env.local
+.env.*.local
+nginx/certs/
+nginx/www/
+nginx/conf.d/new-api.conf
+*.pem
+*.key
