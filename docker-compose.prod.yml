@@ -9,8 +9,16 @@
 #
 # Only the nginx service publishes ports to 0.0.0.0 (80, 443).
 # All other services bind to 127.0.0.1 so they cannot be reached
-# from outside the host. All persistent data lives under ./data on
-# the host so containers stay stateless.
+# from outside the host.
+#
+# Layout:
+#   Deploy dir (this directory, e.g. /data/newapi):
+#     - docker-compose.prod.yml, scripts/, .env
+#     - nginx/conf.d/ (tracked templates + rendered new-api.conf)
+#   Data dir (${DATA_ROOT}, default /data/newapi_data):
+#     - app/, logs/, postgres/, redis/   (application + db state)
+#     - nginx/certs/, nginx/www/, nginx/logs/  (runtime, not source)
+# DATA_ROOT is read from .env; override there if you want a different path.
 
 services:
   new-api:
@@ -21,8 +29,8 @@ services:
     expose:
       - "3000"
     volumes:
-      - ./data/app:/data
-      - ./data/logs:/app/logs
+      - ${DATA_ROOT:-/data/newapi_data}/app:/data
+      - ${DATA_ROOT:-/data/newapi_data}/logs:/app/logs
     environment:
       - SQL_DSN=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
       - REDIS_CONN_STRING=redis://:${REDIS_PASSWORD}@redis:6379
@@ -57,7 +65,7 @@ services:
     ports:
       - "127.0.0.1:5432:5432"
     volumes:
-      - ./data/postgres:/var/lib/postgresql/data
+      - ${DATA_ROOT:-/data/newapi_data}/postgres:/var/lib/postgresql/data
     networks:
       - new-api-network
     healthcheck:
@@ -79,7 +87,7 @@ services:
     ports:
       - "127.0.0.1:6379:6379"
     volumes:
-      - ./data/redis:/data
+      - ${DATA_ROOT:-/data/newapi_data}/redis:/data
     networks:
       - new-api-network
     healthcheck:
@@ -99,9 +107,9 @@ services:
       - "443:443"
     volumes:
       - ./nginx/conf.d:/etc/nginx/conf.d:ro
-      - ./nginx/certs:/etc/letsencrypt:ro
-      - ./nginx/www:/var/www/certbot:ro
-      - ./data/nginx-logs:/var/log/nginx
+      - ${DATA_ROOT:-/data/newapi_data}/nginx/certs:/etc/letsencrypt:ro
+      - ${DATA_ROOT:-/data/newapi_data}/nginx/www:/var/www/certbot:ro
+      - ${DATA_ROOT:-/data/newapi_data}/nginx/logs:/var/log/nginx
     depends_on:
       new-api:
         condition: service_healthy
@@ -115,8 +123,8 @@ services:
     container_name: new-api-certbot
     restart: always
     volumes:
-      - ./nginx/certs:/etc/letsencrypt
-      - ./nginx/www:/var/www/certbot
+      - ${DATA_ROOT:-/data/newapi_data}/nginx/certs:/etc/letsencrypt
+      - ${DATA_ROOT:-/data/newapi_data}/nginx/www:/var/www/certbot
     networks:
       - new-api-network
     # Try to renew every 12h. certbot itself no-ops if not yet due.

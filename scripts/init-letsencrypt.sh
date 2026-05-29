@@ -30,6 +30,7 @@ set +a
 
 : "${DOMAIN_NAME:?DOMAIN_NAME must be set in .env}"
 : "${CERTBOT_EMAIL:?CERTBOT_EMAIL must be set in .env}"
+DATA_ROOT="${DATA_ROOT:-/data/newapi_data}"
 
 STAGING_ARG=""
 for arg in "$@"; do
@@ -41,8 +42,8 @@ done
 
 COMPOSE=(docker compose -f docker-compose.prod.yml --env-file .env)
 
-CERT_DIR="nginx/certs/live/${DOMAIN_NAME}"
-mkdir -p "$CERT_DIR" nginx/www
+CERT_DIR="$DATA_ROOT/nginx/certs/live/${DOMAIN_NAME}"
+mkdir -p "$CERT_DIR" "$DATA_ROOT/nginx/www"
 
 if [[ -s "$CERT_DIR/fullchain.pem" && -s "$CERT_DIR/privkey.pem" ]]; then
     # Detect placeholder vs real cert by issuer.

@@ -3,7 +3,7 @@
 #
 # Steps:
 #   1. Verify docker + docker compose v2.
-#   2. Ensure host directories under ./data and ./nginx exist.
+#   2. Ensure deploy-dir nginx/conf.d/ and data-dir subtrees exist.
 #   3. Generate .env if missing (delegates to scripts/gen-env.sh).
 #   4. Render nginx/conf.d/new-api.conf from the template using ${DOMAIN_NAME}.
 #   5. Bootstrap Let's Encrypt certs if not yet issued.
@@ -21,16 +21,6 @@ die() { printf "[deploy] %s\n" "$*" >&2; exit 1; }
 command -v docker >/dev/null 2>&1 || die "docker is required."
 docker compose version >/dev/null 2>&1 || die "docker compose v2 is required."
 
-log "preparing host directories..."
-mkdir -p \
-    data/app \
-    data/logs \
-    data/postgres \
-    data/redis \
-    data/nginx-logs \
-    nginx/certs \
-    nginx/www
-
 if [[ ! -f .env ]]; then
     log "no .env found, generating one..."
     bash scripts/gen-env.sh
@@ -44,6 +34,20 @@ set -a
 set +a
 
 : "${DOMAIN_NAME:?DOMAIN_NAME must be set in .env}"
+DATA_ROOT="${DATA_ROOT:-/data/newapi_data}"
+
+log "preparing host directories..."
+log "  deploy dir: $REPO_ROOT"
+log "  data dir:   $DATA_ROOT"
+mkdir -p \
+    "$DATA_ROOT/app" \
+    "$DATA_ROOT/logs" \
+    "$DATA_ROOT/postgres" \
+    "$DATA_ROOT/redis" \
+    "$DATA_ROOT/nginx/certs" \
+    "$DATA_ROOT/nginx/www" \
+    "$DATA_ROOT/nginx/logs" \
+    || die "could not create $DATA_ROOT subtree (permission? run with sudo or pre-create the dir)."
 
 if ! command -v envsubst >/dev/null 2>&1; then
     die "envsubst is required (install gettext-base / gettext)."
@@ -54,8 +58,9 @@ envsubst '${DOMAIN_NAME}' \
     < nginx/conf.d/new-api.conf.template \
     > nginx/conf.d/new-api.conf
 
-if [[ ! -s "nginx/certs/live/${DOMAIN_NAME}/fullchain.pem" ]] || \
-   ! openssl x509 -in "nginx/certs/live/${DOMAIN_NAME}/fullchain.pem" -noout -issuer 2>/dev/null | grep -qi "let's encrypt"; then
+CERT_FILE="$DATA_ROOT/nginx/certs/live/${DOMAIN_NAME}/fullchain.pem"
+if [[ ! -s "$CERT_FILE" ]] || \
+   ! openssl x509 -in "$CERT_FILE" -noout -issuer 2>/dev/null | grep -qi "let's encrypt"; then
     log "no Let's Encrypt cert found, running init-letsencrypt..."
     bash scripts/init-letsencrypt.sh
 fi
