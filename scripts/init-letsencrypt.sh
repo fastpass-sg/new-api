@@ -9,8 +9,12 @@
 #      cert from Let's Encrypt.
 #   4. Reload nginx so it picks up the real cert.
 #
+# Refuses to run unless CERT_MODE=letsencrypt in .env (or --force is passed),
+# so it can't accidentally overwrite a user-supplied (BYO) certificate.
+#
 # Flags:
 #   --staging   Use Let's Encrypt staging environment (avoid rate limits).
+#   --force     Run regardless of CERT_MODE. Will replace BYO certs.
 
 set -euo pipefail
 
@@ -31,16 +35,30 @@ set +a
 : "${DOMAIN_NAME:?DOMAIN_NAME must be set in .env}"
 : "${CERTBOT_EMAIL:?CERTBOT_EMAIL must be set in .env}"
 DATA_ROOT="${DATA_ROOT:-/data/newapi_data}"
+CERT_MODE="${CERT_MODE:-byo}"
 
 STAGING_ARG=""
+FORCE=0
 for arg in "$@"; do
     case "$arg" in
         --staging) STAGING_ARG="--staging" ;;
+        --force)   FORCE=1 ;;
         *) echo "[init-letsencrypt] unknown flag: $arg" >&2; exit 2 ;;
     esac
 done
 
-COMPOSE=(docker compose -f docker-compose.prod.yml --env-file .env)
+if [[ "$CERT_MODE" != "letsencrypt" && $FORCE -eq 0 ]]; then
+    cat >&2 <<EOF
+[init-letsencrypt] refusing to run.
+  CERT_MODE=$CERT_MODE in .env — Let's Encrypt is disabled.
+  To enable: set CERT_MODE=letsencrypt in .env, then re-run.
+  To override once: pass --force (will overwrite any BYO cert at
+    $DATA_ROOT/nginx/certs/live/${DOMAIN_NAME}/).
+EOF
+    exit 3
+fi
+
+COMPOSE=(docker compose -f docker-compose.prod.yml --env-file .env --profile letsencrypt)
 
 CERT_DIR="$DATA_ROOT/nginx/certs/live/${DOMAIN_NAME}"
 mkdir -p "$CERT_DIR" "$DATA_ROOT/nginx/www"

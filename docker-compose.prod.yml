@@ -118,10 +118,14 @@ services:
     # Reload nginx every 6h so renewed certificates take effect without restart.
     command: /bin/sh -c "while :; do sleep 6h & wait $${!}; nginx -s reload; done & nginx -g 'daemon off;'"
 
+  # Let's Encrypt auto-renewal. Disabled by default (BYO certificate mode).
+  # Enable by setting CERT_MODE=letsencrypt in .env; deploy.sh / upgrade.sh
+  # then start this service via `docker compose --profile letsencrypt up -d`.
   certbot:
     image: certbot/certbot:latest
     container_name: new-api-certbot
     restart: always
+    profiles: [letsencrypt]
     volumes:
       - ${DATA_ROOT:-/data/newapi_data}/nginx/certs:/etc/letsencrypt
       - ${DATA_ROOT:-/data/newapi_data}/nginx/www:/var/www/certbot
