@@ -47,10 +47,12 @@ services:
       - ERROR_LOG_ENABLED=true
       - BATCH_UPDATE_ENABLED=true
       - TRUSTED_PROXIES=${TRUSTED_PROXIES:-}
-      # deploy.sh derives SESSION_COOKIE_TRUSTED_URL from DOMAIN_NAME when the
-      # .env leaves it blank; new-api refuses to start if SECURE is on without it.
+      # new-api refuses to start when Secure cookies are on and no trusted origin
+      # is given, so the fallback to DOMAIN_NAME lives here rather than in the
+      # deploy scripts. Deriving it in the scripts alone made a plain
+      # `docker compose up` produce a container that could not start.
       - SESSION_COOKIE_SECURE=${SESSION_COOKIE_SECURE:-false}
-      - SESSION_COOKIE_TRUSTED_URL=${SESSION_COOKIE_TRUSTED_URL:-}
+      - SESSION_COOKIE_TRUSTED_URL=${SESSION_COOKIE_TRUSTED_URL:-https://${DOMAIN_NAME}}
     depends_on:
       postgres:
         condition: service_healthy

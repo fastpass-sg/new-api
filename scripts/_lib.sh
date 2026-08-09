@@ -56,12 +56,11 @@ load_env() {
         fi
     fi
 
-    # new-api refuses to start when Secure cookies are on without a trusted
-    # origin. Deriving it from DOMAIN_NAME removes the chance of the two drifting
-    # apart, which is the only way this setting is ever misconfigured.
+    # The fallback itself lives in docker-compose.prod.yml so that a plain
+    # `docker compose up` also produces a startable container. This only reports
+    # what will be used, since a silent origin is the setting people get wrong.
     if [[ "${SESSION_COOKIE_SECURE:-false}" == "true" && -z "${SESSION_COOKIE_TRUSTED_URL:-}" ]]; then
-        export SESSION_COOKIE_TRUSTED_URL="https://${DOMAIN_NAME}"
-        log "derived SESSION_COOKIE_TRUSTED_URL=$SESSION_COOKIE_TRUSTED_URL"
+        log "SESSION_COOKIE_TRUSTED_URL is empty; compose will default it to https://${DOMAIN_NAME}"
     fi
 }
 

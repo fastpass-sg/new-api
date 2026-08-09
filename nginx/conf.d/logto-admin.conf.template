@@ -9,15 +9,8 @@
 # them inside this comment too, and the allowlist is multi-line, so the tail of
 # it would land outside any server block and stop nginx from starting.
 #
-# See logto.conf.template for why the upstream is declared per-file rather than
-# in _shared.conf.
-
-upstream logto_admin {
-    server logto:3002;
-    keepalive 16;
-    keepalive_requests 1000;
-    keepalive_timeout  60s;
-}
+# See logto.conf.template for why the address goes through a variable instead of
+# an `upstream` block.
 
 server {
     listen 443 ssl;
@@ -53,7 +46,10 @@ ${LOGTO_ADMIN_ALLOW_BLOCK}
     proxy_set_header Upgrade    $http_upgrade;
     proxy_set_header Connection $connection_upgrade;
 
+    resolver 127.0.0.11 valid=10s ipv6=off;
+    set $logto_admin http://logto:3002;
+
     location / {
-        proxy_pass http://logto_admin;
+        proxy_pass $logto_admin$request_uri;
     }
 }

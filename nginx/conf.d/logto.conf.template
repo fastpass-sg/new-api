@@ -4,17 +4,16 @@
 # LOGTO_DOMAIN. Rendered only when LOGTO_ENABLED=true, and deleted again when it
 # is not. The rendered logto.conf is gitignored.
 #
-# The upstream is declared here rather than in _shared.conf on purpose: nginx
-# resolves upstream hostnames at startup and refuses to start if one is unknown.
-# Keeping it in the file that only exists while Logto is enabled means disabling
-# Logto can never take the main site down with it.
-
-upstream logto_core {
-    server logto:3001;
-    keepalive 32;
-    keepalive_requests 1000;
-    keepalive_timeout  60s;
-}
+# Deliberately no `upstream` block. nginx resolves upstream hostnames while
+# parsing the config and refuses to start — or to reload — when one is unknown,
+# so a declared `server logto:3001` makes the whole site, not just Logto,
+# dependent on the Logto container existing. That bites during the very first
+# deploy, where certificates have to be issued and nginx reloaded before Logto
+# has ever started.
+#
+# Passing the address through a variable defers resolution to request time via
+# Docker's embedded DNS. Logto being absent, restarting or broken then costs a
+# 502 on its own domain and nothing else.
 
 server {
     listen 443 ssl;
@@ -49,7 +48,14 @@ server {
     proxy_set_header Upgrade    $http_upgrade;
     proxy_set_header Connection $connection_upgrade;
 
+    # Docker's embedded DNS. ipv6=off because the compose network is IPv4 and
+    # the AAAA lookup only adds latency to every resolution.
+    resolver 127.0.0.11 valid=10s ipv6=off;
+    set $logto_core http://logto:3001;
+
     location / {
-        proxy_pass http://logto_core;
+        # $request_uri is explicit rather than implied: once proxy_pass contains
+        # a variable, nginx no longer derives the upstream URI from the location.
+        proxy_pass $logto_core$request_uri;
     }
 }
