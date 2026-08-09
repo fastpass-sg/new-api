@@ -33,7 +33,7 @@
 | 事实 | 位置 |
 |---|---|
 | Custom OAuth Provider 超时 20s，内置 OIDC 仅 5s | `oauth/generic.go:135,215` vs `oauth/oidc.go:77,124` |
-| 前端已为每个 custom provider 渲染「绑定」按钮，迁移零改动 | `web/default/src/features/profile/components/tabs/account-bindings-tab.tsx:118` |
+| 前端已为每个 custom provider 渲染「绑定」按钮，迁移零改动 | `web/src/features/profile/components/tabs/account-bindings-tab.tsx`（rc.24 起 `web/default/` 已扁平化为 `web/`） |
 | 绑定存于独立表，`(provider_id, provider_user_id)` 唯一，可解绑 | `model/user_oauth_binding.go` |
 | **管理员无法代其他用户创建 key**，body 传 `user_id` 被忽略 | `controller/token.go` `AddToken` 用 `c.GetInt("id")`；`/api/token/*` 挂 `UserAuth()` |
 | PAT 是 users 表单字段，每次生成覆盖旧值，无过期无作用域 | `controller/user.go` `GenerateAccessToken`；`model/user.go` `ValidateAccessToken` |
@@ -108,14 +108,16 @@ SELECT 'CREATE DATABASE logto OWNER logto'
 
 | 文件 | 内容 |
 |---|---|
-| `_shared.conf`（新，静态提交） | `map $http_upgrade` + 三个 upstream：`new_api_backend` / `logto_core` / `logto_admin` |
+| `_shared.conf`（新，静态提交） | `map $http_upgrade` + `new_api_backend` upstream |
 | `new-api.conf.template` | 去掉 map/upstream，只保留 server 块 |
-| `logto.conf.template`（新） | `${LOGTO_DOMAIN}` → `logto_core` |
-| `logto-admin.conf.template`（新） | `${LOGTO_ADMIN_DOMAIN}` → `logto_admin`，含可选 IP 白名单 |
+| `logto.conf.template`（新） | `logto_core` upstream + server，按 `LOGTO_DOMAIN` 渲染 |
+| `logto-admin.conf.template`（新） | `logto_admin` upstream + server，按 `LOGTO_ADMIN_DOMAIN` 渲染，含可选 IP 白名单 |
 
 `_bootstrap.conf` 无需改动：它的 `listen 80 default_server` 已覆盖全部域名，ACME 挑战与 HTTPS 跳转对三个域名同时生效。
 
-**启动顺序坑**：nginx 在启动时解析 upstream 主机名，`logto` 容器不存在会导致 **nginx 整体起不来、主站一起挂**。因此 logto 服务不放在 compose profile 后面（恒定存在），且 nginx 对它的 `depends_on` 用 `service_started` 而非 `service_healthy` —— Logto 挂掉不得连累主站。
+**启动顺序坑**：nginx 在启动时解析 upstream 主机名，`logto` 容器不存在会导致 **nginx 整体起不来、主站一起挂**。因此两个 Logto upstream 声明在各自的渲染文件里，而不是静态的 `_shared.conf`：`LOGTO_ENABLED=false` 时这两个文件根本不渲染（且会被删除），nginx 永远不会引用一个不存在的主机。nginx 也不 `depends_on` logto —— Logto 慢或挂都不得拦住主站。
+
+Logto 服务放在 compose profile `logto` 后面，由 `LOGTO_ENABLED` 驱动，使 Phase 1 的升级可以在完全不涉及 Logto 的情况下独立完成。
 
 **证书：混合模式**
 
@@ -187,10 +189,18 @@ Logto 侧本次不建 API resource。
 **新增**
 `nginx/conf.d/_shared.conf`
 `nginx/conf.d/logto.conf.template`、`nginx/conf.d/logto-admin.conf.template`
+`scripts/_lib.sh`（deploy / upgrade / init-letsencrypt 共用的证书、渲染、compose 逻辑）
 `scripts/backup.sh`
 `docs/deploy/logto-sso.md`
 
 **Go / 前端改动：零。**
+
+## 8.1 实施中发现并修复的既有缺陷
+
+两个与 Logto 无关、但会在本次改动后被触发的问题：
+
+1. **重新渲染 nginx 配置后 `up -d` 不会生效**。compose 只在服务定义变化时重建容器，仅改挂载进去的配置文件不会触发重建，nginx 会一直用旧配置直到容器内 6 小时一次的 reload 循环。现在渲染后显式 `nginx -t` 校验并 `nginx -s reload`；校验失败则中止，运行中的站点不受影响。
+2. **`.env` 中含空格的值会破坏 `. ./.env`**。`BACKUP_CRON=15 3 * * *` 会被 shell 拆成 `BACKUP_CRON=15` 加一条 `3 * * *` 命令。`BACKUP_CRON` 与 `LOGTO_ADMIN_ALLOW` 均已加引号并在注释中说明原因。
 
 ## 9. 回滚
 
