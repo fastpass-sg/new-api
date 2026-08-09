@@ -73,8 +73,15 @@ if logto_enabled; then
     done
 
     log "ensuring role '${LOGTO_DB_USER}' and database '${LOGTO_DB_NAME}' exist..."
-    # The role must OWN the database: since PostgreSQL 15 the public schema no
-    # longer grants CREATE to PUBLIC, and Logto's schema seeding fails without it.
+    # Two privileges Logto's schema seeding cannot do without:
+    #   OWNER of the database — since PostgreSQL 15 the public schema no longer
+    #     grants CREATE to PUBLIC, so anything less cannot create tables.
+    #   CREATEROLE — the seed creates Logto's own tenant roles and fails with
+    #     "permission denied to create role" without it.
+    # CREATEROLE is a real grant: on PostgreSQL 15 this role can also alter other
+    # non-superuser roles in the same instance, including the new-api one. That
+    # is the cost of sharing one Postgres between both applications; a separate
+    # instance is the way to avoid it.
     # The password is re-applied on every run so .env stays the single source of
     # truth even after it is rotated.
     escaped_password="${LOGTO_DB_PASSWORD//\'/\'\'}"
@@ -83,9 +90,9 @@ if logto_enabled; then
 DO \$\$
 BEGIN
     IF EXISTS (SELECT FROM pg_roles WHERE rolname = '${LOGTO_DB_USER}') THEN
-        ALTER ROLE ${LOGTO_DB_USER} LOGIN PASSWORD '${escaped_password}';
+        ALTER ROLE ${LOGTO_DB_USER} LOGIN CREATEROLE PASSWORD '${escaped_password}';
     ELSE
-        CREATE ROLE ${LOGTO_DB_USER} LOGIN PASSWORD '${escaped_password}';
+        CREATE ROLE ${LOGTO_DB_USER} LOGIN CREATEROLE PASSWORD '${escaped_password}';
     END IF;
 END
 \$\$;
