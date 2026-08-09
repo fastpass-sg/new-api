@@ -1,24 +1,8 @@
-# Rendered by scripts/deploy.sh and scripts/upgrade.sh via:
-#   envsubst '${DOMAIN_NAME}' < new-api.conf.template > new-api.conf
-# The rendered new-api.conf is gitignored.
-
-# Maps client Connection/Upgrade headers to what we should send upstream:
-#   WebSocket request (Upgrade present) → Connection: upgrade
-#   Regular HTTP                        → Connection: "" (let nginx pool it)
-# Required for `keepalive` in the upstream block to actually work.
-map $http_upgrade $connection_upgrade {
-    default upgrade;
-    ""      "";
-}
-
-# Upstream keepalive: keep up to 100 idle connections to new-api per worker.
-# Cuts TCP handshake overhead and prevents TIME_WAIT accumulation under load.
-upstream new_api_backend {
-    server new-api:3000;
-    keepalive 100;
-    keepalive_requests 10000;
-    keepalive_timeout  60s;
-}
+# Rendered by scripts/deploy.sh and scripts/upgrade.sh, substituting
+# DOMAIN_NAME. The rendered new-api.conf is gitignored.
+#
+# The `map` and `upstream new_api_backend` this file depends on live in
+# _shared.conf, so that adding more rendered server files cannot redefine them.
 
 server {
     listen 443 ssl;
@@ -60,7 +44,7 @@ server {
     proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
     proxy_set_header X-Forwarded-Proto https;
 
-    # See the map{} block at the top of this file.
+    # See the map{} block in _shared.conf.
     proxy_set_header Upgrade    $http_upgrade;
     proxy_set_header Connection $connection_upgrade;
 

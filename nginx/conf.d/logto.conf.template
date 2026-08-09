@@ -1,0 +1,55 @@
+# Logto auth endpoint — the domain applications and browsers talk OIDC to.
+#
+# Rendered by scripts/deploy.sh and scripts/upgrade.sh, substituting
+# LOGTO_DOMAIN. Rendered only when LOGTO_ENABLED=true, and deleted again when it
+# is not. The rendered logto.conf is gitignored.
+#
+# The upstream is declared here rather than in _shared.conf on purpose: nginx
+# resolves upstream hostnames at startup and refuses to start if one is unknown.
+# Keeping it in the file that only exists while Logto is enabled means disabling
+# Logto can never take the main site down with it.
+
+upstream logto_core {
+    server logto:3001;
+    keepalive 32;
+    keepalive_requests 1000;
+    keepalive_timeout  60s;
+}
+
+server {
+    listen 443 ssl;
+    http2 on;
+    server_name ${LOGTO_DOMAIN};
+
+    ssl_certificate     /etc/letsencrypt/live/${LOGTO_DOMAIN}/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/${LOGTO_DOMAIN}/privkey.pem;
+    ssl_protocols       TLSv1.2 TLSv1.3;
+    ssl_ciphers         HIGH:!aNULL:!MD5;
+    ssl_session_cache   shared:SSL:10m;
+    ssl_session_timeout 1d;
+
+    # Sign-in pages and token exchanges; no large bodies, no long polls.
+    client_max_body_size 10m;
+    proxy_connect_timeout 15s;
+    proxy_read_timeout    60s;
+    proxy_send_timeout    60s;
+
+    proxy_http_version 1.1;
+
+    # Logto builds absolute URLs (issuer, redirects) from these. They must match
+    # ENDPOINT in the container environment exactly, or OIDC discovery and the
+    # authorization redirects will point at the wrong origin.
+    proxy_set_header Host              $host;
+    proxy_set_header X-Real-IP         $remote_addr;
+    proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto https;
+    proxy_set_header X-Forwarded-Host  $host;
+
+    # See the map{} block in _shared.conf.
+    proxy_set_header Upgrade    $http_upgrade;
+    proxy_set_header Connection $connection_upgrade;
+
+    location / {
+        proxy_pass http://logto_core;
+    }
+}

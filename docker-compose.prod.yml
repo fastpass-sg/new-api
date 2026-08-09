@@ -14,15 +14,21 @@
 # Layout:
 #   Deploy dir (this directory, e.g. /data/newapi):
 #     - docker-compose.prod.yml, scripts/, .env
-#     - nginx/conf.d/ (tracked templates + rendered new-api.conf)
+#     - nginx/conf.d/ (tracked templates + rendered *.conf)
 #   Data dir (${DATA_ROOT}, default /data/newapi_data):
 #     - app/, logs/, postgres/, redis/   (application + db state)
 #     - nginx/certs/, nginx/www/, nginx/logs/  (runtime, not source)
+#     - backups/                         (pg_dump output, see scripts/backup.sh)
 # DATA_ROOT is read from .env; override there if you want a different path.
+#
+# Optional services live behind compose profiles, both driven from .env:
+#   LOGTO_ENABLED=true      → --profile logto       (single sign-on IdP)
+#   CERT_MODE=letsencrypt   → --profile letsencrypt (certbot auto-renewal)
+#   LOGTO_CERT_MODE=letsencrypt → same certbot profile
 
 services:
   new-api:
-    image: ${NEW_API_IMAGE:-calciumion/new-api:latest}
+    image: ${NEW_API_IMAGE:-calciumion/new-api:v1.0.0-rc.24}
     container_name: new-api
     restart: always
     command: --log-dir /app/logs
@@ -40,6 +46,11 @@ services:
       - NODE_NAME=${NODE_NAME:-new-api-node-1}
       - ERROR_LOG_ENABLED=true
       - BATCH_UPDATE_ENABLED=true
+      - TRUSTED_PROXIES=${TRUSTED_PROXIES:-}
+      # deploy.sh derives SESSION_COOKIE_TRUSTED_URL from DOMAIN_NAME when the
+      # .env leaves it blank; new-api refuses to start if SECURE is on without it.
+      - SESSION_COOKIE_SECURE=${SESSION_COOKIE_SECURE:-false}
+      - SESSION_COOKIE_TRUSTED_URL=${SESSION_COOKIE_TRUSTED_URL:-}
     depends_on:
       postgres:
         condition: service_healthy
@@ -98,6 +109,42 @@ services:
     environment:
       - REDIS_PASSWORD=${REDIS_PASSWORD}
 
+  # Single sign-on identity provider. Enabled by LOGTO_ENABLED=true in .env,
+  # which makes deploy.sh/upgrade.sh add `--profile logto`.
+  #
+  # Reuses the postgres service above via its own database and role, created
+  # idempotently by deploy.sh. `db seed --swe` is skip-when-exists, so it is safe
+  # on every start: first boot seeds the schema, later boots no-op.
+  logto:
+    image: ${LOGTO_IMAGE:-svhd/logto:1.42.0}
+    container_name: new-api-logto
+    restart: always
+    profiles: [logto]
+    entrypoint: ["sh", "-c", "npm run cli db seed -- --swe && npm start"]
+    expose:
+      - "3001"
+      - "3002"
+    environment:
+      # Passwords are generated as hex by gen-env.sh, so no URL escaping is needed.
+      - DB_URL=postgres://${LOGTO_DB_USER:-logto}:${LOGTO_DB_PASSWORD}@postgres:5432/${LOGTO_DB_NAME:-logto}
+      - ENDPOINT=https://${LOGTO_DOMAIN}
+      - ADMIN_ENDPOINT=https://${LOGTO_ADMIN_DOMAIN}
+      - TRUST_PROXY_HEADER=1
+      - TZ=${TZ:-Asia/Shanghai}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - new-api-network
+    healthcheck:
+      # The OIDC discovery document is served once Logto is genuinely ready.
+      # Uses node's global fetch so the check needs no curl/wget in the image.
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3001/oidc/.well-known/openid-configuration').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
   nginx:
     image: nginx:1.27-alpine
     container_name: new-api-nginx
@@ -110,6 +157,9 @@ services:
       - ${DATA_ROOT:-/data/newapi_data}/nginx/certs:/etc/letsencrypt:ro
       - ${DATA_ROOT:-/data/newapi_data}/nginx/www:/var/www/certbot:ro
       - ${DATA_ROOT:-/data/newapi_data}/nginx/logs:/var/log/nginx
+    # Deliberately does NOT depend on logto: a broken or slow Logto must never
+    # keep the main site from serving. nginx resolves the logto upstream only
+    # because deploy.sh renders those server blocks solely when Logto is enabled.
     depends_on:
       new-api:
         condition: service_healthy

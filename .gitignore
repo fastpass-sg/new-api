@@ -49,5 +49,7 @@ go.work.sum
 nginx/certs/
 nginx/www/
 nginx/conf.d/new-api.conf
+nginx/conf.d/logto.conf
+nginx/conf.d/logto-admin.conf
 *.pem
 *.key
