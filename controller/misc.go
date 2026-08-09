@@ -147,6 +147,9 @@ func GetStatus(c *gin.Context) {
 			ClientId              string `json:"client_id"`
 			AuthorizationEndpoint string `json:"authorization_endpoint"`
 			Scopes                string `json:"scopes"`
+			// Lets the client end the session at the identity provider after
+			// signing out here. Empty means the provider has none configured.
+			LogoutEndpoint string `json:"logout_endpoint"`
 		}
 		providersInfo := make([]CustomOAuthInfo, 0, len(customProviders))
 		for _, p := range customProviders {
@@ -159,6 +162,7 @@ func GetStatus(c *gin.Context) {
 				ClientId:              config.ClientId,
 				AuthorizationEndpoint: config.AuthorizationEndpoint,
 				Scopes:                config.Scopes,
+				LogoutEndpoint:        config.LogoutEndpoint,
 			})
 		}
 		data["custom_oauth_providers"] = providersInfo

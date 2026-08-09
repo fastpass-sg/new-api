@@ -5248,6 +5248,8 @@
     "Zero retention": "Aucune rétention",
     "Zhipu": "Zhipu",
     "Zhipu V4": "Zhipu V4",
-    "Zoom": "Zoom"
+    "Zoom": "Zoom",
+    "Logout Endpoint": "Point de terminaison de déconnexion",
+    "Optional. When set, signing out here also ends the session at the provider. The provider must allow this site as a post-logout redirect URI. Leave empty to sign out of this site only.": "Facultatif. Lorsqu’il est défini, la déconnexion ici met également fin à la session chez le fournisseur. Le fournisseur doit autoriser ce site comme URI de redirection après déconnexion. Laissez vide pour ne vous déconnecter que de ce site."
   }
 }

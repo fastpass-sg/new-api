@@ -101,6 +101,7 @@ export function ProviderFormDialog(props: ProviderFormDialogProps) {
       display_name_field: '',
       email_field: '',
       well_known: '',
+      logout_endpoint: '',
       auth_style: 0,
       access_policy: '',
       access_denied_message: '',
@@ -132,6 +133,7 @@ export function ProviderFormDialog(props: ProviderFormDialogProps) {
         display_name_field: props.provider.display_name_field || '',
         email_field: props.provider.email_field || '',
         well_known: props.provider.well_known || '',
+        logout_endpoint: props.provider.logout_endpoint || '',
         auth_style: props.provider.auth_style ?? 0,
         access_policy: props.provider.access_policy || '',
         access_denied_message: props.provider.access_denied_message || '',
@@ -153,6 +155,7 @@ export function ProviderFormDialog(props: ProviderFormDialogProps) {
         display_name_field: '',
         email_field: '',
         well_known: '',
+        logout_endpoint: '',
         auth_style: 0,
         access_policy: '',
         access_denied_message: '',
@@ -495,6 +498,28 @@ export function ProviderFormDialog(props: ProviderFormDialogProps) {
                       {...field}
                     />
                   </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name='logout_endpoint'
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>{t('Logout Endpoint')}</FormLabel>
+                  <FormControl>
+                    <Input
+                      placeholder='https://provider.com/oidc/session/end'
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormDescription>
+                    {t(
+                      'Optional. When set, signing out here also ends the session at the provider. The provider must allow this site as a post-logout redirect URI. Leave empty to sign out of this site only.'
+                    )}
+                  </FormDescription>
                   <FormMessage />
                 </FormItem>
               )}

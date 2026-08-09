@@ -33,6 +33,7 @@ type CustomOAuthProviderResponse struct {
 	DisplayNameField      string `json:"display_name_field"`
 	EmailField            string `json:"email_field"`
 	WellKnown             string `json:"well_known"`
+	LogoutEndpoint        string `json:"logout_endpoint"`
 	AuthStyle             int    `json:"auth_style"`
 	AccessPolicy          string `json:"access_policy"`
 	AccessDeniedMessage   string `json:"access_denied_message"`
@@ -63,6 +64,7 @@ func toCustomOAuthProviderResponse(p *model.CustomOAuthProvider) *CustomOAuthPro
 		DisplayNameField:      p.DisplayNameField,
 		EmailField:            p.EmailField,
 		WellKnown:             p.WellKnown,
+		LogoutEndpoint:        p.LogoutEndpoint,
 		AuthStyle:             p.AuthStyle,
 		AccessPolicy:          p.AccessPolicy,
 		AccessDeniedMessage:   p.AccessDeniedMessage,
@@ -128,6 +130,7 @@ type CreateCustomOAuthProviderRequest struct {
 	DisplayNameField      string `json:"display_name_field"`
 	EmailField            string `json:"email_field"`
 	WellKnown             string `json:"well_known"`
+	LogoutEndpoint        string `json:"logout_endpoint"`
 	AuthStyle             int    `json:"auth_style"`
 	AccessPolicy          string `json:"access_policy"`
 	AccessDeniedMessage   string `json:"access_denied_message"`
@@ -246,6 +249,7 @@ func CreateCustomOAuthProvider(c *gin.Context) {
 		DisplayNameField:      req.DisplayNameField,
 		EmailField:            req.EmailField,
 		WellKnown:             req.WellKnown,
+		LogoutEndpoint:        req.LogoutEndpoint,
 		AuthStyle:             req.AuthStyle,
 		AccessPolicy:          req.AccessPolicy,
 		AccessDeniedMessage:   req.AccessDeniedMessage,
@@ -283,6 +287,7 @@ type UpdateCustomOAuthProviderRequest struct {
 	DisplayNameField      string  `json:"display_name_field"`
 	EmailField            string  `json:"email_field"`
 	WellKnown             *string `json:"well_known"`            // Optional: if nil, keep existing
+	LogoutEndpoint        *string `json:"logout_endpoint"`       // Optional: if nil, keep existing
 	AuthStyle             *int    `json:"auth_style"`            // Optional: if nil, keep existing
 	AccessPolicy          *string `json:"access_policy"`         // Optional: if nil, keep existing
 	AccessDeniedMessage   *string `json:"access_denied_message"` // Optional: if nil, keep existing
@@ -370,6 +375,9 @@ func UpdateCustomOAuthProvider(c *gin.Context) {
 	}
 	if req.WellKnown != nil {
 		provider.WellKnown = *req.WellKnown
+	}
+	if req.LogoutEndpoint != nil {
+		provider.LogoutEndpoint = *req.LogoutEndpoint
 	}
 	if req.AuthStyle != nil {
 		provider.AuthStyle = *req.AuthStyle

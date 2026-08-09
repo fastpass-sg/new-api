@@ -5248,6 +5248,8 @@
     "Zero retention": "データ保持なし",
     "Zhipu": "Zhipu",
     "Zhipu V4": "Zhipu V 4",
-    "Zoom": "ズーム"
+    "Zoom": "ズーム",
+    "Logout Endpoint": "ログアウトエンドポイント",
+    "Optional. When set, signing out here also ends the session at the provider. The provider must allow this site as a post-logout redirect URI. Leave empty to sign out of this site only.": "任意。設定すると、このサイトからログアウトする際にプロバイダーのセッションも終了します。プロバイダー側でこのサイトをログアウト後のリダイレクト URI として許可する必要があります。空欄の場合はこのサイトからのみログアウトします。"
   }
 }

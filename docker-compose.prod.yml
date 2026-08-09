@@ -28,6 +28,9 @@
 
 services:
   new-api:
+    # The fallback is deliberately upstream's image rather than this fork's: it
+    # is always present, whereas the fork's image only exists once CI has run.
+    # Set NEW_API_IMAGE in .env to the fork build to get its patches.
     image: ${NEW_API_IMAGE:-calciumion/new-api:v1.0.0-rc.24}
     container_name: new-api
     restart: always

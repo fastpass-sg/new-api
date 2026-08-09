@@ -66,6 +66,13 @@ export function DiscoveryButton(props: DiscoveryButtonProps) {
           shouldDirty: true,
         })
       }
+      // Optional in OIDC: providers without RP-initiated logout omit it, and
+      // leaving the field empty is what disables the redirect on sign out.
+      if (disc.end_session_endpoint) {
+        props.form.setValue('logout_endpoint', disc.end_session_endpoint, {
+          shouldDirty: true,
+        })
+      }
       if (disc.scopes_supported && disc.scopes_supported.length > 0) {
         const currentScopes = props.form.getValues('scopes')
         if (!currentScopes) {

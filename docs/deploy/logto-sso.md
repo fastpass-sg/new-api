@@ -131,12 +131,15 @@ it, so changing it invalidates every passkey already registered.
    exchanges the code with a client secret and does not send PKCE, so a SPA
    application fails on the missing `code_verifier`.
 2. Redirect URI: `https://<your main domain>/oauth/logto`
-3. Note the App ID and App Secret.
-4. Add the SMTP connector using your transactional email credentials.
-5. Enable CAPTCHA (Turnstile or reCAPTCHA Enterprise). It covers the identifier,
+3. Post sign-out redirect URI: `https://<your main domain>/sign-in`. Required
+   for sign out to end the Logto session — Logto rejects a logout request whose
+   redirect it has not been told to allow, stranding the user on an error page.
+4. Note the App ID and App Secret.
+5. Add the SMTP connector using your transactional email credentials.
+6. Enable CAPTCHA (Turnstile or reCAPTCHA Enterprise). It covers the identifier,
    password, verification-code, registration and password-recovery flows. It
    does **not** cover magic-link or passkey sign-in.
-6. The disposable-email domain blocklist is a Logto Cloud feature and is absent
+7. The disposable-email domain blocklist is a Logto Cloud feature and is absent
    from the self-hosted build. Sync a public disposable-domain list into the
    custom blocklist if free quota is at stake.
 
@@ -152,7 +155,7 @@ Read the real endpoints from the discovery document rather than copying them:
 
 ```bash
 curl -s https://auth.example.com/oidc/.well-known/openid-configuration \
-  | jq '{authorization_endpoint, token_endpoint, userinfo_endpoint}'
+  | jq '{authorization_endpoint, token_endpoint, userinfo_endpoint, end_session_endpoint}'
 ```
 
 | Field | Value |
@@ -167,10 +170,16 @@ curl -s https://auth.example.com/oidc/.well-known/openid-configuration \
 | Username field | `preferred_username` |
 | Display name field | `name` |
 | Email field | `email` |
+| Logout endpoint | `https://auth.example.com/oidc/session/end` |
 | Auth style | `0` (auto detect) |
 
 The field mapping is identical to the built-in Keycloak preset, because Logto
 returns the same standard claims.
+
+Discover fills the logout endpoint too, from `end_session_endpoint`. Leaving it
+empty is a valid choice: sign out then only ends the new-api session and the
+Logto one survives. Setting it requires the post sign-out redirect URI from step
+3 above, and only takes effect on the fork's image.
 
 Test with a throwaway Logto account before announcing anything.
 
@@ -197,12 +206,19 @@ account takeover.
 Recovery: sign in to new-api with their password, then bind from Profile →
 Account Bindings. The Logto account they just made is reused, not duplicated.
 
-### Signing out is not global
+### Signing out
 
-Signing out of new-api does not sign the user out of Logto. Pressing sign-in
-again returns them immediately, which looks like the sign-out failed. Making
-this correct requires a frontend change to trigger RP-initiated logout, which is
-deliberately out of scope here.
+Signing out ends the Logto session too, provided the provider has a **Logout
+Endpoint** configured (see Phase 3). Without it, sign out is local only: the
+Logto session survives, so pressing sign-in returns the user immediately and
+looks like the sign out failed.
+
+This is a fork patch — upstream new-api has no RP-initiated logout at all — so it
+only works when running the fork's image. See the image note in `.env.example`.
+
+Logging out of another application that shares this Logto tenant does **not**
+sign the user out of new-api. That direction needs a backchannel logout endpoint
+in new-api, which does not exist.
 
 ### Review free quota before opening registration
 

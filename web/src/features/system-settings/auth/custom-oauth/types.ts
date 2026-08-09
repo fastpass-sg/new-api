@@ -39,6 +39,7 @@ export interface CustomOAuthProvider {
   display_name_field: string
   email_field: string
   well_known: string
+  logout_endpoint: string // OIDC end_session_endpoint; empty disables RP-initiated logout
   auth_style: number // 0=auto, 1=params, 2=header
   access_policy: string
   access_denied_message: string
@@ -72,6 +73,7 @@ export const customOAuthFormSchema = z.object({
   display_name_field: z.string().optional().default(''),
   email_field: z.string().optional().default(''),
   well_known: z.string().optional().default(''),
+  logout_endpoint: z.string().optional().default(''),
   auth_style: z.number().int().min(0).max(2).default(0),
   access_policy: z.string().optional().default(''),
   access_denied_message: z.string().optional().default(''),
@@ -92,6 +94,7 @@ export interface DiscoveryResponse {
       authorization_endpoint?: string
       token_endpoint?: string
       userinfo_endpoint?: string
+      end_session_endpoint?: string
       scopes_supported?: string[]
     }
   }

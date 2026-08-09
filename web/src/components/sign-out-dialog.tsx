@@ -24,7 +24,10 @@ import { toast } from 'sonner'
 
 import { ConfirmDialog } from '@/components/confirm-dialog'
 import { logout } from '@/features/auth/api'
+import { buildProviderLogoutUrl } from '@/features/auth/lib/oauth'
+import { useStatus } from '@/hooks/use-status'
 import { clearAuthenticatedClientState } from '@/lib/auth-session'
+import { useAuthStore } from '@/stores/auth-store'
 
 interface SignOutDialogProps {
   open: boolean
@@ -35,11 +38,16 @@ export function SignOutDialog({ open, onOpenChange }: SignOutDialogProps) {
   const { t } = useTranslation()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
+  const { status } = useStatus()
   const [isSigningOut, setIsSigningOut] = useState(false)
 
   const handleSignOut = async () => {
     setIsSigningOut(true)
     try {
+      // Read before signing out: the request clears the session from the store,
+      // and the provider it came from is what decides the redirect below.
+      const loginMethod = useAuthStore.getState().auth.session?.login_method
+
       const response = await logout()
       if (!response.success) {
         toast.error(response.message || t('Failed to sign out session'))
@@ -47,6 +55,18 @@ export function SignOutDialog({ open, onOpenChange }: SignOutDialogProps) {
       }
 
       clearAuthenticatedClientState(queryClient)
+
+      const providerLogoutUrl = buildProviderLogoutUrl(
+        loginMethod,
+        status?.custom_oauth_providers,
+        `${window.location.origin}/sign-in`
+      )
+      if (providerLogoutUrl) {
+        // Leaves the SPA entirely, so no toast or router navigation follows.
+        window.location.replace(providerLogoutUrl)
+        return
+      }
+
       toast.success(t('Signed out'))
       void navigate({ to: '/sign-in', replace: true })
     } catch (error: unknown) {

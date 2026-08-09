@@ -16,7 +16,11 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import type { SystemStatus, OAuthProvider } from '../types'
+import type {
+  SystemStatus,
+  OAuthProvider,
+  CustomOAuthProviderInfo,
+} from '../types'
 
 export {
   buildGitHubOAuthUrl,
@@ -85,6 +89,44 @@ export function getAvailableOAuthProviders(
   }
 
   return providers
+}
+
+/**
+ * Build the RP-initiated logout URL for the provider a session came from.
+ *
+ * Signing out here only ends the local session; the identity provider still has
+ * its own, so the next sign-in returns immediately and looks like the sign out
+ * failed. Sending the browser to the provider's end_session_endpoint is what
+ * closes that session too.
+ *
+ * Returns null whenever the redirect does not apply — the session came from a
+ * password or built-in provider login, the provider is gone, or it has no
+ * logout endpoint configured. Callers treat null as "stay local".
+ *
+ * The provider must list postLogoutRedirectUri as an allowed post-logout
+ * redirect, otherwise it rejects the request and strands the user there.
+ */
+export function buildProviderLogoutUrl(
+  loginMethod: string | null | undefined,
+  providers: CustomOAuthProviderInfo[] | null | undefined,
+  postLogoutRedirectUri: string
+): string | null {
+  const prefix = 'oauth:'
+  if (!loginMethod?.startsWith(prefix)) return null
+
+  const slug = loginMethod.slice(prefix.length)
+  const provider = providers?.find((candidate) => candidate.slug === slug)
+  if (!provider?.logout_endpoint) return null
+
+  try {
+    const url = new URL(provider.logout_endpoint)
+    url.searchParams.set('client_id', provider.client_id)
+    url.searchParams.set('post_logout_redirect_uri', postLogoutRedirectUri)
+    return url.toString()
+  } catch {
+    // A malformed endpoint must not block signing out.
+    return null
+  }
 }
 
 /**

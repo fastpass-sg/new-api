@@ -5248,6 +5248,8 @@
     "Zero retention": "Không lưu dữ liệu",
     "Zhipu": "Zhipu",
     "Zhipu V4": "Zhipu V4",
-    "Zoom": "Zoom"
+    "Zoom": "Zoom",
+    "Logout Endpoint": "Điểm cuối Đăng xuất",
+    "Optional. When set, signing out here also ends the session at the provider. The provider must allow this site as a post-logout redirect URI. Leave empty to sign out of this site only.": "Tùy chọn. Khi được đặt, việc đăng xuất tại đây cũng kết thúc phiên tại nhà cung cấp. Nhà cung cấp phải cho phép trang này làm URI chuyển hướng sau khi đăng xuất. Để trống để chỉ đăng xuất khỏi trang này."
   }
 }

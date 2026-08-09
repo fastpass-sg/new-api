@@ -5248,6 +5248,8 @@
     "Zero retention": "零數據保留",
     "Zhipu": "智譜",
     "Zhipu V4": "智譜 V4",
-    "Zoom": "縮放"
+    "Zoom": "縮放",
+    "Logout Endpoint": "登出端點",
+    "Optional. When set, signing out here also ends the session at the provider. The provider must allow this site as a post-logout redirect URI. Leave empty to sign out of this site only.": "可選。填寫後，在本站登出會同時結束身分提供方的工作階段。提供方必須允許本站作為登出後的重新導向位址。留空則僅登出本站。"
   }
 }

@@ -28,7 +28,10 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { logout } from '@/features/auth/api'
+import { buildProviderLogoutUrl } from '@/features/auth/lib/oauth'
+import { useStatus } from '@/hooks/use-status'
 import { clearAuthentication } from '@/lib/api'
+import { useAuthStore } from '@/stores/auth-store'
 
 import { deleteUserAccount } from '../../api'
 
@@ -49,6 +52,7 @@ export function DeleteAccountDialog({
 }: DeleteAccountDialogProps) {
   const { t } = useTranslation()
   const navigate = useNavigate()
+  const { status } = useStatus()
   const [loading, setLoading] = useState(false)
   const [confirmation, setConfirmation] = useState('')
 
@@ -65,6 +69,9 @@ export function DeleteAccountDialog({
       if (response.success) {
         toast.success(t('Account deleted successfully'))
 
+        // Read before signing out: logout clears the session from the store.
+        const loginMethod = useAuthStore.getState().auth.session?.login_method
+
         // Logout and redirect
         try {
           await logout()
@@ -73,6 +80,19 @@ export function DeleteAccountDialog({
         }
 
         clearAuthentication()
+
+        // End the provider session too. Leaving it open would let the deleted
+        // account sign straight back in and silently register a new one.
+        const providerLogoutUrl = buildProviderLogoutUrl(
+          loginMethod,
+          status?.custom_oauth_providers,
+          `${window.location.origin}/sign-in`
+        )
+        if (providerLogoutUrl) {
+          window.location.replace(providerLogoutUrl)
+          return
+        }
+
         navigate({ to: '/sign-in' })
       } else {
         toast.error(response.message || t('Failed to delete account'))

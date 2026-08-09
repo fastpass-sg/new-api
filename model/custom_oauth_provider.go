@@ -58,6 +58,7 @@ type CustomOAuthProvider struct {
 
 	// Advanced options
 	WellKnown           string `json:"well_known" gorm:"type:varchar(512)"`            // OIDC discovery endpoint (optional)
+	LogoutEndpoint      string `json:"logout_endpoint" gorm:"type:varchar(512)"`       // RP-initiated logout (end_session_endpoint); empty disables it
 	AuthStyle           int    `json:"auth_style" gorm:"default:0"`                    // 0=auto, 1=params, 2=header (Basic Auth)
 	AccessPolicy        string `json:"access_policy" gorm:"type:text"`                 // JSON policy for access control based on user info
 	AccessDeniedMessage string `json:"access_denied_message" gorm:"type:varchar(512)"` // Custom error message template when access is denied

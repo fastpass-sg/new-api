@@ -1,0 +1,107 @@
+# Builds this fork's image and pushes it to GitHub Container Registry.
+#
+# Separate from docker-build.yml, which publishes upstream's image to Docker Hub
+# and needs credentials this fork does not have. This one authenticates with the
+# automatic GITHUB_TOKEN, so it works with no configured secrets.
+#
+# The published image is what docker-compose.prod.yml pulls:
+#   NEW_API_IMAGE=ghcr.io/fastpass-sg/new-api:<tag>
+#
+# Packages inherit repository visibility on first publish, so a public repository
+# yields a publicly pullable image and the deploy host needs no registry login.
+#
+# Builds linux/amd64 only, matching the deploy host. Adding linux/arm64 means
+# adding it to `platforms` below; it builds under QEMU emulation and is
+# considerably slower.
+
+name: Build fork image (ghcr.io)
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - '*'
+      - '!nightly*'
+  workflow_dispatch:
+    inputs:
+      platforms:
+        description: 'Target platforms'
+        required: false
+        default: 'linux/amd64'
+        type: string
+
+jobs:
+  build:
+    name: Build & push
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Check out
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      # The Dockerfile stamps this into the binary and the UI reads it back, so
+      # an unwritten VERSION file ships an image that cannot report what it is.
+      - name: Write VERSION
+        run: |
+          if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
+            VERSION="${GITHUB_REF_NAME}"
+          else
+            VERSION="${GITHUB_REF_NAME}-$(git rev-parse --short HEAD)"
+          fi
+          echo "${VERSION}" > VERSION
+          echo "Building ${VERSION}"
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
+
+      - name: Log in to ghcr.io
+        uses: docker/login-action@c99871dec2022cc055c062a10cc1a1310835ceb4 # v4.3.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Tag scheme:
+      #   a git tag        -> that tag, plus `latest`
+      #   a push to main   -> `main` and `main-<sha>`
+      # Pin NEW_API_IMAGE to an immutable tag in production; `latest` exists for
+      # convenience, not for deploys.
+      - name: Derive image tags
+        id: meta
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
+        with:
+          images: ghcr.io/${{ github.repository }}
+          tags: |
+            type=ref,event=tag
+            type=ref,event=branch
+            type=sha,prefix={{branch}}-,event=branch
+            type=raw,value=latest,enable=${{ github.ref_type == 'tag' }}
+
+      - name: Build & push
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        with:
+          context: .
+          push: true
+          platforms: ${{ inputs.platforms || 'linux/amd64' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Summary
+        run: |
+          {
+            echo "### Pushed"
+            echo
+            echo '```'
+            echo "${{ steps.meta.outputs.tags }}"
+            echo '```'
+            echo
+            echo "Deploy by setting NEW_API_IMAGE in .env to one of the tags above, then running ./scripts/upgrade.sh"
+          } >> "$GITHUB_STEP_SUMMARY"

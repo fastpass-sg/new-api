@@ -203,6 +203,9 @@ export interface CustomOAuthProviderInfo {
   client_id: string
   authorization_endpoint: string
   scopes: string
+  // OIDC end_session_endpoint. Empty when the provider has no RP-initiated
+  // logout configured, which is what keeps sign out local to this site.
+  logout_endpoint?: string
 }
 
 // ============================================================================
