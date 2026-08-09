@@ -126,9 +126,14 @@ services:
       - "3002"
     environment:
       # Passwords are generated as hex by gen-env.sh, so no URL escaping is needed.
-      - DB_URL=postgres://${LOGTO_DB_USER:-logto}:${LOGTO_DB_PASSWORD}@postgres:5432/${LOGTO_DB_NAME:-logto}
-      - ENDPOINT=https://${LOGTO_DOMAIN}
-      - ADMIN_ENDPOINT=https://${LOGTO_ADMIN_DOMAIN}
+      # Blank defaults keep compose quiet for deployments that never enable
+      # Logto: it interpolates every service regardless of which profiles are
+      # active, so an undefaulted variable warns even when this service is off.
+      # Nothing starts with blank values by accident — deploy.sh refuses to run
+      # when LOGTO_ENABLED=true and any of these is missing.
+      - DB_URL=postgres://${LOGTO_DB_USER:-logto}:${LOGTO_DB_PASSWORD:-}@postgres:5432/${LOGTO_DB_NAME:-logto}
+      - ENDPOINT=https://${LOGTO_DOMAIN:-}
+      - ADMIN_ENDPOINT=https://${LOGTO_ADMIN_DOMAIN:-}
       - TRUST_PROXY_HEADER=1
       - TZ=${TZ:-Asia/Shanghai}
     depends_on:
