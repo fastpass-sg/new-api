@@ -18,7 +18,7 @@
 
 | 决策点 | 选择 | 理由 |
 |---|---|---|
-| 是否改 new-api 源码 | **否**，继续用官方镜像 | 升级永远跟得上上游；不触发 AGPL §13 |
+| 是否改 new-api 源码 | **是**（决定于实施中途反转，见 §10） | 单点登出没有任何配置级实现路径 |
 | Logto 数据库 | 复用现有 Postgres 实例，独立库和角色 | 省一个容器；`pg_dump` 仍可按库独立备份恢复 |
 | 老用户迁移 | 纯自愿绑定，密码登录长期保留 | 零风险零改动，前端已现成 |
 | 主域证书 | 保留现有 BYO 证书 | 避免切换期的证书告警窗口 |
@@ -175,7 +175,7 @@ Logto 侧本次不建 API resource。
 
 | 项 | 说明 |
 |---|---|
-| 单点登出 | new-api 登出不会登出 Logto，用户再点登录会瞬间自动进入，观感像登出失败。要做需改前端实现 RP-initiated logout。 |
+| ~~单点登出~~ | **已实现**，见 §10。反向的单点登出（从其它站点登出连带登出 new-api）仍然做不到，需要 new-api 提供 backchannel logout 端点。 |
 | 邮箱自动关联 | 老用户若先用 Logto 以同邮箱注册，回调报「邮箱已被占用」。补救：先用密码登录，再在个人设置绑定。写入 FAQ。 |
 | 免费额度策略复核 | Logto 注册门槛低于现有邮箱验证码流程。站点背后是按 token 计费的付费网关，上线前应复核新用户赠额。 |
 
@@ -193,7 +193,7 @@ Logto 侧本次不建 API resource。
 `scripts/backup.sh`
 `docs/deploy/logto-sso.md`
 
-**Go / 前端改动：零。**
+以上为 Phase 0–4 的范围，**不含 Go / 前端改动**。单点登出带来的源码改动见 §10。
 
 ## 8.1 实施中发现并修复的既有缺陷
 
@@ -209,5 +209,40 @@ Logto 侧本次不建 API resource。
 | 阶段 | 回滚方式 |
 |---|---|
 | Phase 1 | 镜像 tag 退回 rc.17 **并从 Phase 0 的 dump 恢复**。rc.24 的 AutoMigrate 会新增列，只退镜像不够。 |
-| Phase 2 | `docker compose stop logto`；nginx 因 upstream 恒定存在仍可启动，Logto 域名返回 502，主站不受影响。 |
+| Phase 2 | `docker compose stop logto`；nginx 不再声明 Logto 的 upstream，容器不在也能启动和 reload，Logto 域名返回 502，主站不受影响。 |
 | Phase 3 | 在 new-api 管理后台禁用 custom oauth provider。密码登录不受影响，已绑定关系保留在表中，重新启用即恢复。 |
+| Phase 5 | 把 `NEW_API_IMAGE` 换回 `calciumion/new-api:v1.0.0-rc.24`。登出退回本地行为，其余一切不变——该字段只是多一列，官方镜像会忽略它。 |
+
+---
+
+## 10. Phase 5 — 单点登出（源码改动）
+
+§2 里「不改源码」的决定在实施中途被推翻。推翻的依据是核查结果而非偏好：
+
+- 上游**最新代码**（`upstream/main`，`823e2630`）全仓库搜索 `end_session` / `post_logout` / `rp-initiated` / `backchannel` **零命中**，近 400 个提交里没有任何登出联动的工作。不存在「等下个版本」的选项。
+- new-api 后端**没有任何** post-logout 重定向配置项，前端登出是一个 XHR，之后不做任何导航。没有配置级的实现路径。
+- 唯一的配置级替代是把 `authorization_endpoint` 写成 `.../oidc/auth?prompt=login`（前端用 `new URL()` + `searchParams.set()` 构造，预置查询参数会被保留，已验证）。但它只是强制每次重新认证，不结束 Logto 会话，且会破坏与其它站点之间真正的 SSO 体验。
+- AGPL §13 的成本被高估了：`fastpass-sg/new-api` 本就是**公开仓库**，合规增量只剩「在关于页放一个源码链接」。
+
+### 设计
+
+复用已有信号：`LoginSessionView.LoginMethod`（`service/auth_session.go`）以 `login_method` 下发给前端，自定义 provider 登录时为 `oauth:<slug>`。判断会话来源不需要额外存储，且跨刷新有效。
+
+| 层 | 改动 |
+|---|---|
+| `model/custom_oauth_provider.go` | 新增 `LogoutEndpoint` |
+| `controller/custom_oauth.go` | 增删改三处请求/响应结构 |
+| `controller/misc.go` | `/api/status` 下发 `logout_endpoint` |
+| 管理后台表单 | 新增字段；Discover 从 `end_session_endpoint` 自动填充 |
+| `features/auth/lib/oauth.ts` | `buildProviderLogoutUrl()`，含单元测试 |
+| 登出 / 删除账号对话框 | 成功后按需跳转 |
+
+**做成可配置字段而非写死 Logto**：discovery 响应本就带回该端点，成本相同却对任意 OIDC IdP 有效，留空即退回原行为。这个形态也具备向上游提 PR 的资格——一旦被合并，维护成本归零。
+
+删除账号走同一路径：否则 Logto 会话仍在，被删账号可立即重新注册。
+
+### 约束
+
+- Logto 应用必须登记 `post_logout_redirect_uri`，否则拒绝跳转并把用户留在错误页。
+- 只在 fork 自建镜像上生效。`.github/workflows/fork-image.yml` 用内置 `GITHUB_TOKEN` 推到 `ghcr.io/fastpass-sg/new-api`，无需额外密钥；但 **GHCR 包默认私有**，与仓库是否公开无关，需一次性手动改为公开或在部署机 `docker login`。
+- 反向单点登出（从其它站点登出连带登出 new-api）仍做不到，需要 new-api 新增 backchannel logout 端点。

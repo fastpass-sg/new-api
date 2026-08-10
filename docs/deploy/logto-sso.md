@@ -228,6 +228,28 @@ given.
 
 ---
 
+## Running a modified build: the source offer
+
+new-api is AGPL-3.0. Section 13 applies the moment you both modify it and let
+people reach it over a network, which is exactly what running the fork's image
+on a public gateway does. It requires the modified version to *prominently
+offer* its Corresponding Source to those users.
+
+Publishing to the world is not what is being asked — offering it to the people
+using the service is. The public `fastpass-sg/new-api` repository already covers
+where the source lives. What is still missing is the visible offer:
+
+**Add a link to `https://github.com/fastpass-sg/new-api` in the footer or About
+page** (System Settings, no code change needed). A repository nobody is pointed
+to does not satisfy "prominently offer".
+
+Two related rules while modifying this code: never remove the QuantumNous
+copyright headers or attribution (AGPL §5 and project policy), and note that a
+commercial licence is available at support@quantumnous.com if an obligation-free
+modification is ever needed.
+
+This is a technical reading of the licence, not legal advice.
+
 ## Backups
 
 `scripts/backup.sh` dumps the new-api database and, once it exists, the Logto
