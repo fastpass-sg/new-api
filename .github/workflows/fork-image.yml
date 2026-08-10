@@ -7,8 +7,13 @@
 # The published image is what docker-compose.prod.yml pulls:
 #   NEW_API_IMAGE=ghcr.io/fastpass-sg/new-api:<tag>
 #
-# Packages inherit repository visibility on first publish, so a public repository
-# yields a publicly pullable image and the deploy host needs no registry login.
+# A package published this way starts out PRIVATE regardless of how visible the
+# repository is, and an anonymous pull then fails with "unauthorized" rather than
+# anything that names the cause. Making it public is a one-time manual step:
+#   https://github.com/orgs/fastpass-sg/packages/container/new-api/settings
+#   -> Danger Zone -> Change visibility -> Public
+# Leaving it private is fine too, but then every host that pulls needs
+# `docker login ghcr.io` with a token carrying read:packages.
 #
 # Builds linux/amd64 only, matching the deploy host. Adding linux/arm64 means
 # adding it to `platforms` below; it builds under QEMU emulation and is

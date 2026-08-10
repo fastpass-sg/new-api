@@ -275,6 +275,7 @@ received.
 | Connection failure or timeout | Logto unreachable from the new-api container. Both are on the same compose network; check `docker compose ps` |
 | nginx will not start after a config change | Run `docker compose -f docker-compose.prod.yml exec nginx nginx -t`. `deploy.sh` and `upgrade.sh` run this before restarting anything |
 | Logto container restart loop | Check `docker compose logs logto`. Usually the database role or ownership; `deploy.sh` recreates both idempotently |
+| Image pull fails with `unauthorized` | The ghcr.io package is private. GHCR publishes privately by default even from a public repository; make the package public once in its settings, or `docker login ghcr.io` with a read:packages token |
 
 ---
 
