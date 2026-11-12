@@ -27,6 +27,7 @@ import { logout } from '@/features/auth/api'
 import { buildProviderLogoutUrl } from '@/features/auth/lib/oauth'
 import { useStatus } from '@/hooks/use-status'
 import { clearAuthenticatedClientState } from '@/lib/auth-session'
+import { handleServerError } from '@/lib/handle-server-error'
 import { useAuthStore } from '@/stores/auth-store'
 
 interface SignOutDialogProps {
@@ -50,7 +51,7 @@ export function SignOutDialog({ open, onOpenChange }: SignOutDialogProps) {
 
       const response = await logout()
       if (!response.success) {
-        toast.error(response.message || t('Failed to sign out session'))
+        handleServerError(response, t('Failed to sign out session'))
         return
       }
 
@@ -70,9 +71,7 @@ export function SignOutDialog({ open, onOpenChange }: SignOutDialogProps) {
       toast.success(t('Signed out'))
       void navigate({ to: '/sign-in', replace: true })
     } catch (error: unknown) {
-      toast.error(
-        error instanceof Error ? error.message : t('Failed to sign out session')
-      )
+      handleServerError(error, t('Failed to sign out session'))
     } finally {
       setIsSigningOut(false)
     }
